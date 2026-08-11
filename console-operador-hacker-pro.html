@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Console do Operador // Red Team</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --bg: #0A0E13;
+  --panel: #10161D;
+  --panel-2: #151D26;
+  --line: #223040;
+  --amber: #FFB454;
+  --cyan: #4FD1C5;
+  --red: #E5626B;
+  --text: #DCE4EB;
+  --muted: #7C8A99;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', sans-serif;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+body::before{
+  content:"";
+  position:fixed; inset:0;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.025) 1px, transparent 0);
+  background-size: 22px 22px;
+  pointer-events:none;
+  z-index:0;
+}
+.app{ position:relative; z-index:1; max-width:720px; margin:0 auto; padding:14px 12px 90px; }
+
+.readout{
+  border:1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border-radius:10px;
+  padding:12px 14px;
+  margin-bottom:12px;
+}
+.readout-top{ display:flex; justify-content:space-between; align-items:baseline; }
+.readout-title{ font-family:var(--mono); font-size:13px; letter-spacing:0.08em; color:var(--amber); font-weight:700; }
+.readout-sub{ font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:2px; }
+.readout-dot{ width:7px; height:7px; border-radius:50%; background:var(--cyan); display:inline-block; margin-right:6px; box-shadow:0 0 6px var(--cyan); }
+.progress-track{ margin-top:10px; height:6px; background:#1A232D; border-radius:4px; overflow:hidden; display:flex; gap:2px; }
+.progress-seg{ flex:1; background:#1A232D; border-radius:2px; transition:background .3s; }
+.progress-seg.filled{ background:var(--amber); }
+.progress-label{ font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:6px; display:flex; justify-content:space-between; }
+
+.tabs{ display:flex; gap:6px; margin-bottom:12px; }
+.tab{
+  flex:1; text-align:center; padding:9px 4px; border-radius:8px;
+  font-family:var(--mono); font-size:11px; letter-spacing:0.03em;
+  color:var(--muted); background:var(--panel); border:1px solid var(--line);
+  cursor:pointer; user-select:none; transition:all .15s;
+}
+.tab.active{ color:var(--bg); background:var(--amber); border-color:var(--amber); font-weight:700; }
+
+.view{ display:none; }
+.view.active{ display:block; }
+
+.chat-log{ display:flex; flex-direction:column; gap:10px; margin-bottom:10px; min-height:200px; }
+.msg{ max-width:88%; padding:10px 12px; border-radius:10px; font-size:14px; line-height:1.5; white-space:pre-wrap; }
+.msg.user{ align-self:flex-end; background:#1B2734; border:1px solid var(--line); }
+.msg.ai{ align-self:flex-start; background:var(--panel); border:1px solid var(--line); border-left:2px solid var(--cyan); }
+.msg.ai .tag{ font-family:var(--mono); font-size:10px; color:var(--cyan); display:block; margin-bottom:4px; letter-spacing:0.05em; }
+.msg.user .tag{ font-family:var(--mono); font-size:10px; color:var(--amber); display:block; margin-bottom:4px; text-align:right; letter-spacing:0.05em; }
+.msg.loading{ color:var(--muted); font-family:var(--mono); font-size:12px; }
+
+.chips{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.chip{ font-family:var(--mono); font-size:10.5px; padding:6px 9px; border-radius:20px; border:1px solid var(--line); color:var(--muted); background:var(--panel); cursor:pointer; }
+.chip:active{ color:var(--amber); border-color:var(--amber); }
+
+.chat-actions{ display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.chat-action-btn{
+  font-family:var(--mono); font-size:10.5px; padding:6px 10px; border-radius:8px;
+  border:1px solid var(--line); background:var(--panel); color:var(--muted); cursor:pointer;
+}
+.chat-action-btn:hover{ border-color:var(--amber); color:var(--amber); }
+.chat-action-btn.danger:hover{ border-color:var(--red); color:var(--red); }
+
+.input-bar{ position:fixed; bottom:0; left:0; right:0; background:linear-gradient(180deg, transparent, var(--bg) 30%); padding:10px 12px 14px; z-index:5; }
+.input-inner{ max-width:696px; margin:0 auto; display:flex; gap:8px; }
+.input-inner textarea{
+  flex:1; resize:none; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+  color:var(--text); font-family:var(--sans); font-size:14px; padding:10px 12px; min-height:42px; max-height:110px;
+}
+.input-inner textarea:focus{ outline:none; border-color:var(--amber); }
+.send-btn{
+  background:var(--amber); color:var(--bg); border:none; border-radius:10px; width:44px; font-weight:700;
+  font-family:var(--mono); cursor:pointer;
+}
+.send-btn:disabled{ opacity:0.4; }
+
+.phase{ border:1px solid var(--line); border-radius:10px; margin-bottom:10px; overflow:hidden; background:var(--panel); }
+.phase-head{ display:flex; align-items:center; justify-content:space-between; padding:11px 13px; cursor:pointer; }
+.phase-num{ font-family:var(--mono); color:var(--amber); font-size:11px; margin-right:8px; }
+.phase-title{ font-family:var(--mono); font-size:13px; font-weight:700; }
+.phase-count{ font-family:var(--mono); font-size:10.5px; color:var(--muted); }
+.phase-items{ border-top:1px solid var(--line); padding:6px 13px 10px; }
+.item{ display:flex; align-items:flex-start; gap:9px; padding:7px 0; font-size:13.5px; }
+.item input{ margin-top:3px; accent-color: var(--amber); width:15px; height:15px; flex-shrink:0; }
+.item.done label{ color:var(--muted); text-decoration:line-through; }
+
+.lab-form{ display:flex; gap:6px; margin-bottom:12px; }
+.lab-form input, .lab-form select{
+  background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:8px; font-size:13px; font-family:var(--sans);
+}
+.lab-form input{ flex:2; }
+.lab-form select{ flex:1; }
+.lab-add{ background:var(--cyan); color:var(--bg); border:none; border-radius:8px; padding:0 12px; font-weight:700; cursor:pointer; }
+.lab-card{ border:1px solid var(--line); background:var(--panel); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+.lab-top{ display:flex; justify-content:space-between; align-items:center; }
+.lab-name{ font-weight:600; font-size:14px; }
+.lab-plat{ font-family:var(--mono); font-size:10px; color:var(--muted); }
+.status-pill{ font-family:var(--mono); font-size:10px; padding:3px 8px; border-radius:20px; border:1px solid var(--line); }
+.status-pill.todo{ color:var(--muted); }
+.status-pill.progress{ color:var(--amber); border-color:var(--amber); }
+.status-pill.done{ color:var(--cyan); border-color:var(--cyan); }
+.lab-del{ background:none; border:none; color:var(--muted); font-family:var(--mono); font-size:11px; cursor:pointer; margin-top:6px; }
+.empty{ font-family:var(--mono); font-size:12px; color:var(--muted); text-align:center; padding:24px 0; }
+
+.settings-box{
+  border:1px solid var(--line); background:var(--panel); border-radius:10px;
+  padding:12px; margin-bottom:12px; display:none;
+}
+.settings-box.open{ display:block; }
+.settings-box label{ font-family:var(--mono); font-size:11px; color:var(--muted); display:block; margin-bottom:6px; }
+.settings-box input, .settings-box select{
+  width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:8px;
+  color:var(--text); font-family:var(--mono); font-size:13px; padding:8px 10px; margin-bottom:8px;
+}
+.settings-box input:focus, .settings-box select:focus{ outline:none; border-color:var(--amber); }
+.settings-actions{ display:flex; gap:8px; margin-top:6px; }
+.settings-actions button{
+  font-family:var(--mono); font-size:11px; padding:7px 12px; border-radius:8px; cursor:pointer; border:1px solid var(--line);
+}
+.settings-save{ background:var(--amber); color:var(--bg); border-color:var(--amber); font-weight:700; }
+.settings-cancel{ background:var(--panel-2); color:var(--muted); }
+
+.header-actions{ display:flex; gap:6px; }
+.icon-btn{
+  background:none; border:1px solid var(--line); color:var(--muted); border-radius:6px;
+  font-family:var(--mono); font-size:11px; padding:4px 8px; cursor:pointer;
+}
+.icon-btn:hover{ border-color:var(--amber); color:var(--amber); }
+
+.hint{ font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:4px; line-height:1.4; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="readout">
+    <div class="readout-top">
+      <div>
+        <div class="readout-title"><span class="readout-dot"></span>CONSOLE DO OPERADOR</div>
+        <div class="readout-sub">RED TEAM · MENTALIDADE OFENSIVA</div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="settingsBtn" title="Configurações">⚙</button>
+      </div>
+    </div>
+    <div class="progress-track" id="progressTrack"></div>
+    <div class="progress-label"><span id="progressText">0/0 etapas concluídas</span><span id="progressPct">0%</span></div>
+  </div>
+
+  <div class="settings-box" id="settingsBox">
+    <label>Chave da API Groq (gratuita)</label>
+    <input type="password" id="apiKeyInput" placeholder="gsk_...">
+    <div class="hint">console.groq.com → API Keys</div>
+
+    <label style="margin-top:10px;">Modelo</label>
+    <select id="modelSelect">
+      <option value="llama-3.3-70b-versatile">Llama 3.3 70B (recomendado)</option>
+      <option value="llama-3.1-8b-instant">Llama 3.1 8B (rápido)</option>
+      <option value="gemma2-9b-it">Gemma 2 9B</option>
+      <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+    </select>
+
+    <div class="settings-actions">
+      <button class="settings-save" id="saveKeyBtn">Salvar</button>
+      <button class="settings-cancel" id="cancelKeyBtn">Fechar</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-view="mentor">OPERADOR</div>
+    <div class="tab" data-view="checklist">CHECKLIST</div>
+    <div class="tab" data-view="labs">LABS</div>
+  </div>
+
+  <div class="view active" id="view-mentor">
+    <div class="chat-actions">
+      <button class="chat-action-btn danger" id="clearChatBtn">Limpar</button>
+      <button class="chat-action-btn" id="copyLastBtn">Copiar última</button>
+    </div>
+    <div class="chat-log" id="chatLog"></div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="view" id="view-checklist">
+    <div id="phaseList"></div>
+  </div>
+
+  <div class="view" id="view-labs">
+    <div class="lab-form">
+      <input id="labName" type="text" placeholder="Nome da sala/lab">
+      <select id="labPlatform">
+        <option>TryHackMe</option>
+        <option>HTB Academy</option>
+        <option>HackTheBox</option>
+        <option>PortSwigger</option>
+        <option>PentesterLab</option>
+        <option>Lab local</option>
+        <option>Outro</option>
+      </select>
+      <button class="lab-add" id="labAddBtn">+</button>
+    </div>
+    <div id="labList"></div>
+  </div>
+
+</div>
+
+<div class="input-bar" id="inputBar">
+  <div class="input-inner">
+    <textarea id="chatInput" placeholder="Cola o output, descreve o alvo ou pergunta a técnica..." rows="1"></textarea>
+    <button class="send-btn" id="sendBtn">→</button>
+  </div>
+</div>
+
+<script>
+const PHASES = [
+  { id:'recon', title:'Reconhecimento', items:[
+    'Definir escopo e regras de engajamento',
+    'OSINT passivo (whois, DNS, redes sociais, Google dorking)',
+    'Enumeração de subdomínios',
+    'Fingerprint de tecnologias (Wappalyzer, headers)'
+  ]},
+  { id:'scan', title:'Varredura e Enumeração', items:[
+    'Scan de portas (nmap -sC -sV)',
+    'Enumeração de serviços (SMB, FTP, HTTP, etc.)',
+    'Enumeração de diretórios web (gobuster/ffuf)',
+    'Identificação de versões e CVEs conhecidas'
+  ]},
+  { id:'exploit', title:'Exploração', items:[
+    'Validar vulnerabilidade manualmente antes de explorar',
+    'Buscar PoC/exploit em fontes confiáveis (Exploit-DB)',
+    'Explorar em ambiente controlado',
+    'Documentar payload e resultado'
+  ]},
+  { id:'post', title:'Pós-Exploração', items:[
+    'Enumeração local (usuários, permissões, cron jobs)',
+    'Busca por escalonamento de privilégios',
+    'Coleta de evidências',
+    'Pivoting / movimentação lateral'
+  ]},
+  { id:'report', title:'Relatório', items:[
+    'Descrever vulnerabilidade e impacto',
+    'Passos de reprodução claros',
+    'Evidências (screenshots, comandos)',
+    'Recomendações de correção'
+  ]}
+];
+
+const CHIP_PROMPTS = [
+  'Como estruturar um scan de nmap eficiente?',
+  'Analisa este resultado de nmap pra mim',
+  'Como enumerar SMB de forma completa?',
+  'Caminhos comuns de privilege escalation no Linux',
+  'Como pensar a exploração de uma aplicação web?',
+  'Quais TTPs você usaria após conseguir shell?',
+  'Como montar um attack path a partir de informações de recon?'
+];
+
+const SYSTEM_PROMPT = `Você é um pentester profissional e operador de Red Team com mentalidade ofensiva afiada. Você não ensina como professor de curso. Você pensa e orienta como um atacante experiente que está no meio de uma operação.
+
+### COMO VOCÊ PENSA (mentalidade de hacker profissional):
+
+1. **Sempre pensa em impacto e caminho de ataque**
+   - O que essa informação me dá?
+   - Como eu transformo isso em acesso, escalonamento ou movimento lateral?
+   - Qual o caminho mais curto e mais silencioso até o objetivo?
+
+2. **Prioriza**
+   - Serviços com histórico de RCE ou credenciais padrão primeiro
+   - Superfícies de ataque com maior ROI
+   - O que o blue team menos espera
+
+3. **Encadeia técnicas**
+   - Não para em "achou a porta". Já pensa no próximo passo, no pivot, no privesc, no loot.
+   - Sempre considera: "e se isso falhar, qual o plano B?"
+
+4. **Lê outputs como um atacante**
+   - Quando o usuário cola resultado de nmap, gobuster, enum4linux, etc., você analisa ponto a ponto o que é explorável e o que é ruído.
+   - Destaca banners, versões, shares interessantes, scripts de default, etc.
+
+5. **Linguagem e postura**
+   - Direto, técnico, sem enrolação.
+   - Fala como quem já fez isso dezenas de vezes.
+   - Usa termos de red team quando faz sentido (foothold, beacon, lateral movement, OPSEC, etc.).
+   - Explica o raciocínio ofensivo por trás da técnica, não só o comando.
+
+### ESTILO DE RESPOSTA:
+- Português do Brasil, tom de operador experiente.
+- Estrutura clara: o que eu vejo → o que isso significa → o que fazer agora → comandos prontos.
+- Quando mostrar comando, explica as flags importantes e o que observar no resultado.
+- Se faltar informação crítica, pergunta de forma objetiva o que precisa.
+- Não inventa vulnerabilidades. Baseia-se no que o usuário mostrou.
+
+### CONTEXTO:
+O usuário está estudando e praticando em labs (TryHackMe, HTB, PortSwigger, lab local com Kali/Metasploitable) e lendo o livro Técnicas de Invasão. Trate como um operador em treinamento que quer pensar como profissional.
+
+Responda sempre com a cabeça de quem está atacando.`;
+
+const MAX_HISTORY = 14;
+
+function storageGet(key){
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+function storageSet(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }
+  catch(e){ console.error('Erro ao salvar', key, e); }
+}
+
+let checklistState = {};
+let labs = [];
+let chatHistory = [];
+let apiKey = '';
+let selectedModel = 'llama-3.3-70b-versatile';
+
+function init(){
+  checklistState = storageGet('checklist-state') || {};
+  labs = storageGet('labs-list') || [];
+  chatHistory = storageGet('chat-history') || [];
+  apiKey = localStorage.getItem('groq-api-key') || '';
+  selectedModel = localStorage.getItem('groq-model') || 'llama-3.3-70b-versatile';
+
+  if(apiKey) document.getElementById('apiKeyInput').value = apiKey;
+  document.getElementById('modelSelect').value = selectedModel;
+
+  renderChecklist();
+  renderProgress();
+  renderLabs();
+  renderChips();
+  renderChat();
+
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click', ()=>switchView(t.dataset.view));
+  });
+  document.getElementById('sendBtn').addEventListener('click', sendMessage);
+  document.getElementById('chatInput').addEventListener('keydown', (e)=>{
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+  });
+  document.getElementById('chatInput').addEventListener('input', autoGrow);
+  document.getElementById('labAddBtn').addEventListener('click', addLab);
+
+  document.getElementById('settingsBtn').addEventListener('click', ()=>{
+    document.getElementById('settingsBox').classList.toggle('open');
+  });
+  document.getElementById('saveKeyBtn').addEventListener('click', ()=>{
+    apiKey = document.getElementById('apiKeyInput').value.trim();
+    selectedModel = document.getElementById('modelSelect').value;
+    localStorage.setItem('groq-api-key', apiKey);
+    localStorage.setItem('groq-model', selectedModel);
+    document.getElementById('settingsBox').classList.remove('open');
+  });
+  document.getElementById('cancelKeyBtn').addEventListener('click', ()=>{
+    document.getElementById('settingsBox').classList.remove('open');
+  });
+
+  document.getElementById('clearChatBtn').addEventListener('click', clearChat);
+  document.getElementById('copyLastBtn').addEventListener('click', copyLastReply);
+}
+
+function autoGrow(e){
+  e.target.style.height='auto';
+  e.target.style.height=Math.min(e.target.scrollHeight,110)+'px';
+}
+
+function switchView(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.view===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.getElementById('inputBar').style.display = name==='mentor' ? 'block' : 'none';
+  document.querySelector('.app').style.paddingBottom = name==='mentor' ? '90px' : '20px';
+}
+
+function renderChecklist(){
+  const container = document.getElementById('phaseList');
+  container.innerHTML = '';
+  PHASES.forEach((phase, pIdx)=>{
+    const doneCount = phase.items.filter((_, i)=>checklistState[phase.id+'-'+i]).length;
+    const div = document.createElement('div');
+    div.className = 'phase';
+    div.innerHTML = `
+      <div class="phase-head">
+        <div><span class="phase-num">0${pIdx+1}</span><span class="phase-title">${phase.title}</span></div>
+        <span class="phase-count">${doneCount}/${phase.items.length}</span>
+      </div>
+      <div class="phase-items">
+        ${phase.items.map((item, i)=>{
+          const id = phase.id+'-'+i;
+          const checked = checklistState[id] ? 'checked' : '';
+          const doneClass = checklistState[id] ? 'done' : '';
+          return `<div class="item ${doneClass}">
+            <input type="checkbox" data-id="${id}" ${checked}>
+            <label>${item}</label>
+          </div>`;
+        }).join('')}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  container.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', (e)=>{
+      checklistState[e.target.dataset.id] = e.target.checked;
+      storageSet('checklist-state', checklistState);
+      renderChecklist();
+      renderProgress();
+    });
+  });
+}
+
+function renderProgress(){
+  const total = PHASES.reduce((a,p)=>a+p.items.length,0);
+  const done = Object.values(checklistState).filter(Boolean).length;
+  const pct = total ? Math.round((done/total)*100) : 0;
+
+  const track = document.getElementById('progressTrack');
+  track.innerHTML = '';
+  const segments = 20;
+  const filledSegs = Math.round((pct/100)*segments);
+  for(let i=0;i<segments;i++){
+    const seg = document.createElement('div');
+    seg.className = 'progress-seg' + (i<filledSegs ? ' filled' : '');
+    track.appendChild(seg);
+  }
+  document.getElementById('progressText').textContent = `${done}/${total} etapas concluídas`;
+  document.getElementById('progressPct').textContent = pct+'%';
+}
+
+function addLab(){
+  const nameInput = document.getElementById('labName');
+  const platformSelect = document.getElementById('labPlatform');
+  const name = nameInput.value.trim();
+  if(!name) return;
+  labs.unshift({ id: Date.now().toString(), name, platform: platformSelect.value, status:'todo' });
+  storageSet('labs-list', labs);
+  nameInput.value='';
+  renderLabs();
+}
+
+function renderLabs(){
+  const container = document.getElementById('labList');
+  if(labs.length===0){
+    container.innerHTML = '<div class="empty">Nenhum lab cadastrado ainda.</div>';
+    return;
+  }
+  container.innerHTML = labs.map(lab=>`
+    <div class="lab-card">
+      <div class="lab-top">
+        <div>
+          <div class="lab-name">${escapeHtml(lab.name)}</div>
+          <div class="lab-plat">${escapeHtml(lab.platform)}</div>
+        </div>
+        <select class="status-pill ${lab.status}" data-id="${lab.id}" style="background:var(--panel); font-family:var(--mono);">
+          <option value="todo" ${lab.status==='todo'?'selected':''}>A fazer</option>
+          <option value="progress" ${lab.status==='progress'?'selected':''}>Em andamento</option>
+          <option value="done" ${lab.status==='done'?'selected':''}>Concluído</option>
+        </select>
+      </div>
+      <button class="lab-del" data-del="${lab.id}">remover</button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('select').forEach(sel=>{
+    sel.addEventListener('change', (e)=>{
+      const lab = labs.find(l=>l.id===e.target.dataset.id);
+      if(lab){ lab.status = e.target.value; storageSet('labs-list', labs); renderLabs(); }
+    });
+  });
+  container.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      labs = labs.filter(l=>l.id!==e.target.dataset.del);
+      storageSet('labs-list', labs);
+      renderLabs();
+    });
+  });
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function renderChips(){
+  const el = document.getElementById('chips');
+  el.innerHTML = CHIP_PROMPTS.map(p=>`<div class="chip">${p}</div>`).join('');
+  el.querySelectorAll('.chip').forEach(c=>{
+    c.addEventListener('click', ()=>{
+      document.getElementById('chatInput').value = c.textContent;
+      sendMessage();
+    });
+  });
+}
+
+function renderChat(){
+  const log = document.getElementById('chatLog');
+  if(chatHistory.length===0){
+    log.innerHTML = `<div class="msg ai"><span class="tag">OPERADOR</span>Online. Cola o output do scan, descreve o que você já tem ou pergunta a técnica. Vamos pensar como atacante.</div>`;
+    return;
+  }
+  log.innerHTML = chatHistory.map(m=>`
+    <div class="msg ${m.role==='user'?'user':'ai'}">
+      <span class="tag">${m.role==='user'?'VOCÊ':'OPERADOR'}</span>${escapeHtml(m.content)}
+    </div>
+  `).join('');
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearChat(){
+  if(!confirm('Limpar a conversa?')) return;
+  chatHistory = [];
+  storageSet('chat-history', chatHistory);
+  renderChat();
+}
+
+function copyLastReply(){
+  const last = [...chatHistory].reverse().find(m => m.role === 'assistant');
+  if(!last){ alert('Nada para copiar.'); return; }
+  navigator.clipboard.writeText(last.content).then(()=>{
+    const btn = document.getElementById('copyLastBtn');
+    const old = btn.textContent;
+    btn.textContent = 'Copiado!';
+    setTimeout(()=> btn.textContent = old, 1500);
+  }).catch(()=> alert('Falha ao copiar.'));
+}
+
+async function sendMessage(){
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if(!text) return;
+
+  if(!apiKey){
+    alert('Configure a chave da Groq no ⚙.');
+    document.getElementById('settingsBox').classList.add('open');
+    return;
+  }
+
+  const sendBtn = document.getElementById('sendBtn');
+  chatHistory.push({role:'user', content:text});
+  input.value=''; input.style.height='auto';
+  renderChat();
+  storageSet('chat-history', chatHistory);
+
+  sendBtn.disabled = true;
+  const log = document.getElementById('chatLog');
+  const loadingEl = document.createElement('div');
+  loadingEl.className = 'msg ai loading';
+  loadingEl.textContent = 'analisando...';
+  log.appendChild(loadingEl);
+  log.scrollTop = log.scrollHeight;
+
+  try{
+    const recent = chatHistory.slice(-MAX_HISTORY);
+    const apiMessages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...recent.map(m => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content
+      }))
+    ];
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        messages: apiMessages,
+        max_tokens: 1500,
+        temperature: 0.6
+      })
+    });
+
+    const data = await response.json();
+    if(!response.ok){
+      throw new Error(data.error?.message || data.message || `Erro ${response.status}`);
+    }
+
+    const reply = data.choices?.[0]?.message?.content || 'Falha ao gerar resposta.';
+    chatHistory.push({role:'assistant', content:reply});
+  }catch(err){
+    console.error(err);
+    let msg = 'Erro. ';
+    if(err.message.toLowerCase().includes('auth') || err.message.includes('401')){
+      msg += 'Chave inválida. Verifique no ⚙.';
+    } else if(err.message.includes('429') || err.message.toLowerCase().includes('rate')){
+      msg += 'Rate limit. Espere ou troque de modelo.';
+    } else {
+      msg += err.message || 'Verifique a conexão.';
+    }
+    chatHistory.push({role:'assistant', content: msg});
+  }
+
+  loadingEl.remove();
+  sendBtn.disabled = false;
+  renderChat();
+  storageSet('chat-history', chatHistory);
+}
+
+init();
+</script>
+</body>
+</html>
