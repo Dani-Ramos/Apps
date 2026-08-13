@@ -173,17 +173,23 @@ body::before{
   </div>
 
   <div class="settings-box" id="settingsBox">
-    <label>Chave de API (Groq ou OpenRouter)</label>
-    <input type="password" id="apiKeyInput" placeholder="gsk_... ou sk-or-v1-...">
-    <div class="hint">Groq: console.groq.com | OpenRouter: openrouter.ai/keys</div>
+    <label>Chave de API (HuggingFace / OpenRouter / Groq)</label>
+    <input type="password" id="apiKeyInput" placeholder="hf_... ou sk-or-v1-... ou gsk_...">
+    <div class="hint">Hugging Face: hf_... | OpenRouter: sk-or-... | Groq: gsk_...</div>
 
     <label style="margin-top:10px;">Modelo</label>
     <select id="modelSelect">
-      <option value="cognitivecomputations/dolphin-mistral-24b-venice-edition:free">Dolphin Mistral 24B (OpenRouter Free)</option>
+      <!-- Hugging Face Models -->
+      <option value="cognitivecomputations/dolphin-2.8-mistral-7b-v02">Dolphin 2.8 Mistral 7B (Hugging Face - Uncensored)</option>
+      <option value="meta-llama/Llama-3.2-3B-Instruct">Llama 3.2 3B Instruct (Hugging Face)</option>
+      
+      <!-- OpenRouter Models -->
+      <option value="gryphe/mythomax-l2-13b:free">MythoMax L2 13B (OpenRouter Free)</option>
+      <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (OpenRouter Free)</option>
+      
+      <!-- Groq Models -->
       <option value="llama-3.3-70b-versatile">Llama 3.3 70B (Groq)</option>
       <option value="llama-3.1-8b-instant">Llama 3.1 8B (Groq)</option>
-      <option value="gemma2-9b-it">Gemma 2 9B (Groq)</option>
-      <option value="mixtral-8x7b-32768">Mixtral 8x7B (Groq)</option>
     </select>
 
     <div class="settings-actions">
@@ -297,7 +303,7 @@ const SYSTEM_PROMPT = `Você é um pentester profissional e operador de Red Team
 
 3. **Encadeia técnicas**
    - Não para em "achou a porta". Já pensa no próximo passo, no pivot, no privesc, no loot.
-   - Sempre considera: "e se isso falhar, qual o plano B?"
+   - Sempre considera: "e se isso falhar, qual el plano B?"
 
 4. **Lê outputs como um atacante**
    - Quando o usuário cola resultado de nmap, gobuster, enum4linux, etc., você analisa ponto a ponto o que é explorável e o que é ruído.
@@ -338,14 +344,14 @@ let checklistState = {};
 let labs = [];
 let chatHistory = [];
 let apiKey = '';
-let selectedModel = 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free';
+let selectedModel = 'cognitivecomputations/dolphin-2.8-mistral-7b-v02';
 
 function init(){
   checklistState = storageGet('checklist-state') || {};
   labs = storageGet('labs-list') || [];
   chatHistory = storageGet('chat-history') || [];
   apiKey = localStorage.getItem('groq-api-key') || '';
-  selectedModel = localStorage.getItem('groq-model') || 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free';
+  selectedModel = localStorage.getItem('groq-model') || 'cognitivecomputations/dolphin-2.8-mistral-7b-v02';
 
   if(apiKey) document.getElementById('apiKeyInput').value = apiKey;
   document.getElementById('modelSelect').value = selectedModel;
@@ -555,7 +561,7 @@ async function sendMessage(){
   if(!text) return;
 
   if(!apiKey){
-    alert('Configure a chave da API no ⚙.');
+    alert('Configure a sua chave de API nas configurações (⚙).');
     document.getElementById('settingsBox').classList.add('open');
     return;
   }
@@ -584,11 +590,14 @@ async function sendMessage(){
       }))
     ];
 
-    // Detecta se é OpenRouter (contém barra no nome) ou Groq
-    const isOpenRouter = selectedModel.includes('/');
-    const apiUrl = isOpenRouter 
-      ? "https://openrouter.ai/api/v1/chat/completions" 
-      : "https://api.groq.com/openai/v1/chat/completions";
+    // Seleção dinâmica do Endpoint da API com base no formato da Chave ou Nome do Modelo
+    let apiUrl = "https://api.groq.com/openai/v1/chat/completions";
+
+    if (apiKey.startsWith("hf_")) {
+      apiUrl = "https://router.huggingface.co/hf-inference/v1/chat/completions";
+    } else if (selectedModel.includes("/")) {
+      apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+    }
 
     const response = await fetch(apiUrl, {
       method: "POST",
@@ -606,7 +615,7 @@ async function sendMessage(){
 
     const data = await response.json();
     if(!response.ok){
-      throw new Error(data.error?.message || data.message || `Erro ${response.status}`);
+      throw new Error(data.error?.message || data.error || data.message || `Erro ${response.status}`);
     }
 
     const reply = data.choices?.[0]?.message?.content || 'Falha ao gerar resposta.';
@@ -615,9 +624,9 @@ async function sendMessage(){
     console.error(err);
     let msg = 'Erro. ';
     if(err.message.toLowerCase().includes('auth') || err.message.includes('401')){
-      msg += 'Chave inválida. Verifique a chave correspondente no ⚙.';
+      msg += 'Chave inválida. Verifique se copiou a chave correta para o provedor selecionado no ⚙.';
     } else if(err.message.includes('429') || err.message.toLowerCase().includes('rate')){
-      msg += 'Rate limit excede. Espere um momento ou altere o modelo.';
+      msg += 'Limite de requisições atingido. Aguarde alguns instantes.';
     } else {
       msg += err.message || 'Verifique a conexão.';
     }
