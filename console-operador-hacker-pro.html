@@ -179,11 +179,10 @@ body::before{
 
     <label style="margin-top:10px;">Modelo</label>
     <select id="modelSelect">
-      <!-- Hugging Face (Modelos Ativos na API Gratuita) -->
-      <option value="HuggingFaceH4/zephyr-7b-beta">Zephyr 7B Beta (HF - Pouco Filtro)</option>
-      <option value="mistralai/Mistral-7B-Instruct-v0.3">Mistral 7B Instruct v0.3 (HF - Técnico)</option>
-      <option value="meta-llama/Llama-3.2-3B-Instruct">Llama 3.2 3B Instruct (HF)</option>
-      <option value="ehartford/WizardLM-13B-Uncensored">WizardLM 13B Uncensored (HF)</option>
+      <!-- Hugging Face (Modelos Ativos na API Gratuita Serverless) -->
+      <option value="meta-llama/Llama-3.2-3B-Instruct">Llama 3.2 3B Instruct (Hugging Face)</option>
+      <option value="Qwen/Qwen2.5-Coder-32B-Instruct">Qwen 2.5 Coder 32B (Hugging Face)</option>
+      <option value="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B">DeepSeek R1 Distill 32B (Hugging Face)</option>
 
       <!-- OpenRouter (Caso use chave sk-or-...) -->
       <option value="gryphe/mythomax-l2-13b:free">MythoMax L2 13B (OpenRouter Free - Muito Permissivo)</option>
@@ -346,14 +345,14 @@ let checklistState = {};
 let labs = [];
 let chatHistory = [];
 let apiKey = '';
-let selectedModel = 'HuggingFaceH4/zephyr-7b-beta';
+let selectedModel = 'meta-llama/Llama-3.2-3B-Instruct';
 
 function init(){
   checklistState = storageGet('checklist-state') || {};
   labs = storageGet('labs-list') || [];
   chatHistory = storageGet('chat-history') || [];
   apiKey = localStorage.getItem('groq-api-key') || '';
-  selectedModel = localStorage.getItem('groq-model') || 'HuggingFaceH4/zephyr-7b-beta';
+  selectedModel = localStorage.getItem('groq-model') || 'meta-llama/Llama-3.2-3B-Instruct';
 
   if(apiKey) document.getElementById('apiKeyInput').value = apiKey;
   document.getElementById('modelSelect').value = selectedModel;
